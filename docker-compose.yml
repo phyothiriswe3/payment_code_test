@@ -1,0 +1,69 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: checkout
+      MYSQL_USER: checkout
+      MYSQL_PASSWORD: checkout
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__MySql: "Server=mysql;Port=3306;Database=checkout;User=checkout;Password=checkout;"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      TwoC2P__MerchantId: ${TWOC2P_MERCHANT_ID:-JT01}
+      TwoC2P__SecretKey: ${TWOC2P_SECRET_KEY:?set TWOC2P_SECRET_KEY in .env}
+      TwoC2P__BackendReturnUrl: ${PUBLIC_API_URL:?set PUBLIC_API_URL in .env}/api/payments/2c2p/notification
+      TwoC2P__FrontendReturnUrl: ${PUBLIC_API_URL}/api/payments/2c2p/return
+      App__FrontendBaseUrl: ${FRONTEND_BASE_URL:-http://localhost:3000}
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  # Optional public tunnel for 2C2P callbacks: `docker compose --profile tunnel up`
+  # (copy the printed https://*.trycloudflare.com URL into PUBLIC_API_URL and restart api)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate --url http://api:8080
+    depends_on:
+      - api
+
+volumes:
+  mysql-data:

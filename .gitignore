@@ -1,0 +1,29 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# secrets (never commit the 2C2P secret key)
+appsettings.Development.json
+.env
+.env.*
+!.env.example
+
+# node / next
+node_modules/
+.next/
+out/
+next-env.d.ts
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# confidential assessment brief
+*.pdf
+
+# local planning notes
+docs/plans/
